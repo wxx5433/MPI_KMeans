@@ -61,16 +61,4 @@ public class CSVReader {
 			e.printStackTrace();
 		}
 	}
-	
-	// just a test
-	public static void main(String[] args) {
-		CSVReader csvReader = new CSVReader("cluster.csv");
-		String[] resultStrings;
-		while ((resultStrings = csvReader.readRecord()) != null) {
-			for (String str: resultStrings) {
-				System.out.print(str + " ");
-			}
-			System.out.println();
-		}
-	}
 }
