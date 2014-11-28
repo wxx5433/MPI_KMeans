@@ -45,6 +45,10 @@ public class PointCluster {
 	public boolean isEmpty() {
 		return points.size() == 0;
 	}
+	
+	public Iterable<Point2D> getPoints() {
+		return this.points;
+	}
 //
 //	public Point2D getFarthestPoint() {
 //		return farthestPoint;
