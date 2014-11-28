@@ -13,7 +13,7 @@ import java.util.Set;
  * @author Ye Zhou (yezhou)
  *
  */
-public class KMeansPoint {
+public class SequentialKMeansOnPoint {
 
 	// all data points
 	private List<Point2D> points;
@@ -26,7 +26,7 @@ public class KMeansPoint {
 	// list of k clusters
 	private List<PointCluster> pointClusters;
 
-	public KMeansPoint(String fileName, int k, int maxIter) {
+	public SequentialKMeansOnPoint(String fileName, int k, int maxIter) {
 		this.k = k;
 		this.maxIter = maxIter;
 		this.pointClusters = new ArrayList<PointCluster>();
@@ -175,7 +175,7 @@ public class KMeansPoint {
 		int maxIter = Integer.parseInt(args[1]);
 		String inputFileName = args[2];
 		String outputFileName = args[3];
-		KMeansPoint kmp = new KMeansPoint(inputFileName, k, maxIter);
+		SequentialKMeansOnPoint kmp = new SequentialKMeansOnPoint(inputFileName, k, maxIter);
 		kmp.doClustering();
 		kmp.outputResult(outputFileName);
 	}
