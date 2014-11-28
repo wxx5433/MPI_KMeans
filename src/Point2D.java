@@ -22,6 +22,16 @@ public class Point2D {
 		this.cluster = cluster;
 	}
 	
+	/**
+	 * compute square distance to another point
+	 * @param that
+	 * @return square distance between two points
+	 */
+	public double distanceTo(Point2D that) {
+		return Math.pow(this.x - that.x, 2) 
+				+ Math.pow(this.y - that.y, 2);
+	}
+	
 	public double getX() {
 		return x;
 	}
