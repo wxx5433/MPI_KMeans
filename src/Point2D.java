@@ -9,6 +9,7 @@ public class Point2D {
 
 	// to which cluster the point belong
 	private int cluster;
+	// coordinates of the point
 	private double x;
 	private double y;
 	

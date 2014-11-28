@@ -31,6 +31,11 @@ public class CSVReader {
 		br = new BufferedReader(fr);
 	}
 	
+	/**
+	 * Treat one line in the CSV file as one record, 
+	 * use "," to separate fields in the record
+	 * @return String array of all the fields in the record
+	 */
 	public String[] readRecord() {
 		StringTokenizer tokens = null;
 		String[] results = null;

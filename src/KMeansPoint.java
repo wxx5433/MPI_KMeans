@@ -7,13 +7,23 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-
+/**
+ * Do K Means on 2D points 
+ * @author Xiaoxiang Wu (xiaoxiaw)
+ * @author Ye Zhou (yezhou)
+ *
+ */
 public class KMeansPoint {
 
+	// all data points
 	private List<Point2D> points;
+	// total data point Number
 	private int pointNum;
+	// cluster number
 	private int k;
+	// maximum iterations to run k means
 	private int maxIter;
+	// list of k clusters
 	private List<PointCluster> pointClusters;
 
 	public KMeansPoint(String fileName, int k, int maxIter) {
@@ -26,6 +36,10 @@ public class KMeansPoint {
 		initializeCluster();
 	}
 
+	/**
+	 * load all data points from CSV file
+	 * @param fileName name of the CSV file to load
+	 */
 	private void loadData(String fileName) {
 		CSVReader csvReader = new CSVReader(fileName);
 		String[] coordinates = null;
@@ -59,13 +73,14 @@ public class KMeansPoint {
 		}
 	}
 
+	/**
+	 * Do Clustering all all data points using K Means algorithm
+	 * Stop conditions: 
+	 * 		1. reach max iterations 
+	 *  	2. no change between 2 iterations
+	 */
 	public void doClustering() {
 		boolean changed = true;
-		/*
-		 *  stop conditions: 
-		 *  1. reach max iterations 
-		 *  2. no change between 2 iterations
-		 */
 		for (int i = 0; i < maxIter; ++i) {
 			System.out.println("Iteration " + (i + 1) + "...");
 			for (Point2D point: points) {
@@ -87,21 +102,30 @@ public class KMeansPoint {
 					point.setCluster(clusterIndex);
 				}
 			}
-			// no change between 2 iterations
+			// no change between 2 iterations, already converge!
 			if (!changed) {
 				break;
 			}
+			// update cluster centroid
 			updateCentroid();
 			changed = false;
 		}
 	}
 
+	/**
+	 * update all clusters' centroid point
+	 */
 	private void updateCentroid() {
 		for (PointCluster pc: pointClusters) {
 			pc.updateCentroid();
 		}
 	}
 
+	/**
+	 * assign each point to its nearest cluster centroid
+	 * @param point the data point to be assigned
+	 * @return index of the cluster in cluster list
+	 */
 	private int findNearestCentroid(Point2D point) {
 		double minDistance = Double.MAX_VALUE;
 		int minIndex = 0;
@@ -116,6 +140,10 @@ public class KMeansPoint {
 		return minIndex;
 	}
 
+	/**
+	 * Write result to file
+	 * @param outputFileName name of the output file
+	 */
 	public void outputResult(String outputFileName) {
 		FileWriter fw  = null;
 		BufferedWriter bw = null;
@@ -151,6 +179,5 @@ public class KMeansPoint {
 		kmp.doClustering();
 		kmp.outputResult(outputFileName);
 	}
-
 }
 
