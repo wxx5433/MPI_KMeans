@@ -1,3 +1,6 @@
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -43,6 +46,12 @@ public class KMeansPoint {
 		// use hash set to avoid choosing the same point
 		Set<Integer> centerIndexes = new HashSet<Integer>();
 		Random random = new Random();
+		//			PointCluster pc = new PointCluster();
+		//			pc.setCentroid(new Point2D(points.get(0)));
+		//			pointClusters.add(pc);
+		//			PointCluster pc2 = new PointCluster();
+		//			pc2.setCentroid(new Point2D(points.get(1)));
+		//			pointClusters.add(pc2);
 		for (int i = 0; i < k;) {
 			int centerIndex = random.nextInt(pointNum);
 			if (centerIndexes.contains(centerIndex)) {
@@ -57,26 +66,34 @@ public class KMeansPoint {
 	}
 
 	public void doClustering() {
-		boolean changed = false;
+		boolean changed = true;
 		/*
 		 *  top conditions: 
 		 *  1. reach max iterations 
 		 *  2. no change between 2 iterations
 		 */
 		for (int i = 0; i < maxIter; ++i) {
+			System.out.println("Iteration " + (i + 1) + "...");
 			for (Point2D point: points) {
 				int clusterIndex = findNearestCentroid(point);
 				PointCluster pc = pointClusters.get(clusterIndex);
 				int originalClusterIndex = point.getCluster();
+				// first iteration
+				if (originalClusterIndex == -1) {
+					pc.addPoint(point);
+					point.setCluster(clusterIndex);
+					continue;
+				}
 				// remove from the original cluster
-				if (originalClusterIndex != -1 
-						&& clusterIndex != originalClusterIndex) {
+				if (clusterIndex != originalClusterIndex) {
 					pointClusters.get(originalClusterIndex).removePoint(point);
 					changed = true;  // some point change to another cluster
+					// add to new cluster
+					pc.addPoint(point);
+					point.setCluster(clusterIndex);
 				}
-				// add to new cluster
-				pc.addPoint(point);
 			}
+			// no change between 2 iterations
 			if (!changed) {
 				break;
 			}
@@ -105,11 +122,40 @@ public class KMeansPoint {
 		return minIndex;
 	}
 
+	public void outputResult(String outputFileName) {
+		FileWriter fw  = null;
+		BufferedWriter bw = null;
+		try {
+			fw = new FileWriter(outputFileName);
+			bw = new BufferedWriter(fw);
+			for (int i = 0; i < k; ++i) {
+				PointCluster pc = pointClusters.get(i);
+				bw.write("Cluster " + i + ":\n");
+				for (Point2D point: pc.getPoints()) {
+					bw.write("\t" + point + "\n");
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				bw.close();
+				fw.close();
+			} catch (IOException e) {
+				System.out.println("Fail to close output file");
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public static void main(String[] args) {
 		int k = Integer.parseInt(args[0]);
 		int maxIter = Integer.parseInt(args[1]);
-		KMeansPoint kmp = new KMeansPoint("cluster.csv", k, maxIter);
+		String inputFileName = args[2];
+		String outputFileName = args[3];
+		KMeansPoint kmp = new KMeansPoint(inputFileName, k, maxIter);
 		kmp.doClustering();
+		kmp.outputResult(outputFileName);
 	}
 
 }
