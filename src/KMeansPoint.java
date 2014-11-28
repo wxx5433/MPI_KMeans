@@ -10,17 +10,19 @@ public class KMeansPoint {
 	private List<Point2D> points;
 	private int pointNum;
 	private int k;
+	private int maxIter;
 	private List<PointCluster> pointClusters;
-	
-	public KMeansPoint(String fileName, int k) {
+
+	public KMeansPoint(String fileName, int k, int maxIter) {
 		this.k = k;
+		this.maxIter = maxIter;
 		this.pointClusters = new ArrayList<PointCluster>();
 		this.points = new ArrayList<Point2D>();
 		loadData(fileName);
 		this.pointNum = points.size();
 		initializeCluster();
 	}
-	
+
 	private void loadData(String fileName) {
 		CSVReader csvReader = new CSVReader(fileName);
 		String[] coordinates = null;
@@ -32,13 +34,13 @@ public class KMeansPoint {
 			points.add(point);
 		}
 	}
-	
+
 	/**
 	 * Randomly choose k points to be the centroid point
 	 */
 	private void initializeCluster() {
 		assert(this.pointNum >= k);
-
+		// use hash set to avoid choosing the same point
 		Set<Integer> centerIndexes = new HashSet<Integer>();
 		Random random = new Random();
 		for (int i = 0; i < k;) {
@@ -53,32 +55,42 @@ public class KMeansPoint {
 			++i;
 		}
 	}
-	
-	/**
-	 * need iterations here !!!!!!!!!!!
-	 */
+
 	public void doClustering() {
-		for (Point2D point: points) {
-			int clusterIndex = findNearestCentroid(point);
-			PointCluster pc = pointClusters.get(clusterIndex);
-			int originalClusterIndex = point.getCluster();
-			// remove from the original cluster
-			if (originalClusterIndex != -1 
-					&& clusterIndex != originalClusterIndex) {
-				pointClusters.get(originalClusterIndex).removePoint(point);
+		boolean changed = false;
+		/*
+		 *  top conditions: 
+		 *  1. reach max iterations 
+		 *  2. no change between 2 iterations
+		 */
+		for (int i = 0; i < maxIter; ++i) {
+			for (Point2D point: points) {
+				int clusterIndex = findNearestCentroid(point);
+				PointCluster pc = pointClusters.get(clusterIndex);
+				int originalClusterIndex = point.getCluster();
+				// remove from the original cluster
+				if (originalClusterIndex != -1 
+						&& clusterIndex != originalClusterIndex) {
+					pointClusters.get(originalClusterIndex).removePoint(point);
+					changed = true;  // some point change to another cluster
+				}
+				// add to new cluster
+				pc.addPoint(point);
 			}
-			// add to new cluster
-			pc.addPoint(point);
+			if (!changed) {
+				break;
+			}
+			updateCentroid();
+			changed = false;
 		}
-		updateCentroid();
 	}
-	
+
 	private void updateCentroid() {
 		for (PointCluster pc: pointClusters) {
 			pc.updateCentroid();
 		}
 	}
-	
+
 	private int findNearestCentroid(Point2D point) {
 		double minDistance = Double.MAX_VALUE;
 		int minIndex = 0;
@@ -92,11 +104,13 @@ public class KMeansPoint {
 		}
 		return minIndex;
 	}
-	
+
 	public static void main(String[] args) {
 		int k = Integer.parseInt(args[0]);
-		KMeansPoint kmp = new KMeansPoint("cluster.csv", k);
+		int maxIter = Integer.parseInt(args[1]);
+		KMeansPoint kmp = new KMeansPoint("cluster.csv", k, maxIter);
 		kmp.doClustering();
 	}
 
 }
+
