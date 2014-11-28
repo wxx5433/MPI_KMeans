@@ -37,4 +37,9 @@ public class Point2D {
 	public int getCluster() {
 		return this.cluster;
 	}
+
+	@Override
+	public String toString() {
+		return "(" + this.x + ", " + this.y + ")";
+	}
 }
