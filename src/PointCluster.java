@@ -5,11 +5,15 @@ import java.util.Set;
 public class PointCluster {
 	private Set<Point2D> points;
 	private Point2D centroid;
-	private Point2D farthestPoint;
-	private double farestDistance;
+//	private Point2D farthestPoint;
+//	private double farestDistance;
 	
 	public PointCluster() {
 		points = new HashSet<Point2D>();
+	}
+	
+	public void setCentroid(Point2D point) {
+		this.centroid = point;
 	}
 	
 	public Point2D getCentroid() {
@@ -41,23 +45,21 @@ public class PointCluster {
 	public boolean isEmpty() {
 		return points.size() == 0;
 	}
-
-	public Point2D getFarthestPoint() {
-		return farthestPoint;
-	}
-
-	public void setFarthestPoint(Point2D farthestPoint) {
-		this.farthestPoint = farthestPoint;
-	}
-
-	public double getFarestDistance() {
-		return farestDistance;
-	}
-
-	public void setFarestDistance(double farestDistance) {
-		this.farestDistance = farestDistance;
-	}
-	
-	
+//
+//	public Point2D getFarthestPoint() {
+//		return farthestPoint;
+//	}
+//
+//	public void setFarthestPoint(Point2D farthestPoint) {
+//		this.farthestPoint = farthestPoint;
+//	}
+//
+//	public double getFarestDistance() {
+//		return farestDistance;
+//	}
+//
+//	public void setFarestDistance(double farestDistance) {
+//		this.farestDistance = farestDistance;
+//	}
 
 }

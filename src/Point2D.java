@@ -15,11 +15,16 @@ public class Point2D {
 	public Point2D(double x, double y) {
 		this.x = x;
 		this.y = y;
+		this.cluster = -1;
 	}
 	
 	public Point2D(double x, double y, int cluster) {
 		this(x, y);
 		this.cluster = cluster;
+	}
+	
+	public Point2D(Point2D point) {
+		this(point.x, point.y);
 	}
 	
 	/**
