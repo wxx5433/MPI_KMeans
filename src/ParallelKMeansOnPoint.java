@@ -2,7 +2,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -10,8 +9,12 @@ import java.util.Set;
 
 import mpi.*;
 
-// Send(java.lang.Object buf, int offset, int count, Datatype datatype, int dest, int tag)
-// Blocking send operation.
+/**
+ * Parallel version of K means on 2D points.
+ * @author Xiaoxiang Wu (xiaoxiaw)
+ * @author Ye Zhou (yezhou)
+ *
+ */
 public class ParallelKMeansOnPoint {
 
 	// all data points
@@ -37,7 +40,6 @@ public class ParallelKMeansOnPoint {
 		this.size = MPI.COMM_WORLD.Size();
 		this.k = k;
 		this.maxIter = maxIter;
-//		this.pointClusters = new PointCluster[k];
 		this.allDataPoints = new ArrayList<Point2D>();
 		loadData(fileName);
 		this.pointNum = allDataPoints.size();
@@ -70,25 +72,19 @@ public class ParallelKMeansOnPoint {
 	 * Randomly choose k points to be the centroid point
 	 */
 	private void initializeCluster() {
-		System.out.println("call init");
+		//		System.out.println("call init");
 		assert(this.pointNum >= k);
-		//			System.out.println("I'm rank 0!!");
 		// use hash set to avoid choosing the same point
-		centroids[0] = new Point2D(allDataPoints.get(0));
-		centroids[1] = new Point2D(allDataPoints.get(3));
-		System.out.println(centroids[0]);
-		System.out.println(centroids[1]);
-//		Set<Integer> centerIndexes = new HashSet<Integer>();
-//		Random random = new Random();
-//		for (int i = 0; i < k;) {
-//			int centerIndex = random.nextInt(pointNum);
-//			if (centerIndexes.contains(centerIndex)) {
-//				continue;
-//			}
-//			centroids[i++] = new Point2D(allDataPoints.get(centerIndex));
-//			centerIndexes.add(centerIndex);
-//		} 
-		//			System.out.println("size " + size);
+		Set<Integer> centerIndexes = new HashSet<Integer>();
+		Random random = new Random();
+		for (int i = 0; i < k;) {
+			int centerIndex = random.nextInt(pointNum);
+			if (centerIndexes.contains(centerIndex)) {
+				continue;
+			}
+			centroids[i++] = new Point2D(allDataPoints.get(centerIndex));
+			centerIndexes.add(centerIndex);
+		} 
 	}
 
 	/**
@@ -98,109 +94,43 @@ public class ParallelKMeansOnPoint {
 	 *  	2. no change between 2 iterations
 	 */
 	public void doClustering() {
-		if (rank == 0) { // rank 0 do not do compute
+		if (rank == 0) { // master do not compute
 			for (int iter = 1; iter < maxIter; ++iter) {
 				// tell slaves the new centroid points
-				for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
-					System.out.println("sending to rank " + slaveRank + " new centoird point");
-					MPI.COMM_WORLD.Send(centroids, 0, k, MPI.OBJECT, slaveRank, 1);
-				}
-				boolean changed = false;
-				// receive from all slaves if their points have changed clusters between 2 clusters
-				for (int slaveRank = 1; slaveRank < size; ++slaveRank ) {
-					// It's weird that I cannot simply pass boolean using MPI.COMM_WORLD.Send
-					boolean[] slaveChanged = new boolean[1];
-					slaveChanged[0] = false;
-					MPI.COMM_WORLD.Recv(slaveChanged, 0, 1, MPI.BOOLEAN, slaveRank, 2);
-					changed |= slaveChanged[0];
-					System.out.println("Receive from rank " + rank + " of changed info: " + slaveChanged[0]);
-				}
-				boolean[] stop = new boolean[1];
-				stop[0] = !changed;
-				// if no change through all slaves, then ask slaves to stop computing
-				for (int slaveRank = 1; slaveRank < size; ++slaveRank ) {
-					MPI.COMM_WORLD.Send(stop, 0, 1, MPI.BOOLEAN, slaveRank, 3);
+				broadcastNewCentroids();
+
+				// ask each slaves to know if the algorithm can stop
+				boolean stop = canStop();
+				if (stop) {  // done!
+					return;
 				}
 
-				if (stop[0]) {
-					System.out.println("telling slaves to stop");
-					break;
-				}
 				// aggregate all clusters info from slaves
-				pointClusters = new PointCluster[k];
-				for (int i = 0; i < k; ++i) {
-					pointClusters[i] = new PointCluster();
-				}
-//				for (int i = 0; i < k; ++i) {
-//					pointClusters[i].printCluster(rank);
-//				}
-
-				for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
-					PointCluster[] tmpClusters = new PointCluster[k];
-					MPI.COMM_WORLD.Recv(tmpClusters, 0, k, MPI.OBJECT, slaveRank, 4);
-					System.out.println("Reveive clusters info from slave rank " + slaveRank);
-					for (int i = 0; i < k; ++i) {
-//						tmpClusters[i].printCluster(rank);
-						pointClusters[i].addAll(tmpClusters[i]);  // do not calculate sum here.
-						// add clusters sum computed by slave ranks
-						pointClusters[i].increaseSum(tmpClusters[i].getSumX(), tmpClusters[i].getSumY());
-//						pointClusters[i].printCluster(rank);
-						System.out.println("sumX: " + pointClusters[i].getSumX() + " sumY:" + pointClusters[i].getSumY());
-					}
-				}
-				outputResult("tmp" + iter);
+				aggregateClustersInfo();
+				
 				// now can easily recalculate centroids by infomation fetched from slaves
 				updateCentroid();
 			}
-		} else {
+			// reach maximum iterations, stop the algorithm!
+			tellStop(true);
+		} else {  // slaves 
 			int iter = 1;
 			while (true) {
 				System.out.println("Rank " + rank + " Iteration " + iter + "...");
 				// first receive new centroid points from master
-				MPI.COMM_WORLD.Recv(centroids, 0, k, MPI.OBJECT, 0, 1);
-				for (int i = 0; i < k; ++i) {
-					System.out.println("rank " + rank + " receive centroid point: " 
-							+ centroids[i]);
-				}
+				receiveNewCentroids();
+
 				// assign each point to its nearest centroid point
 				boolean[] changed = new boolean[1];
-				changed[0] = false;
-				int start = offset, end; 
-				if (rank == size - 1) {  // last processor may have more points to compute
-					end = pointNum;
-				} else {
-					end = offset + len;
-				}
-				System.out.println("rank " + rank + " start:" + start + ", end:" + end);
 				PointCluster[] tmpClusters = new PointCluster[k];
 				for (int i = 0; i < k; ++i) {
 					tmpClusters[i] = new PointCluster();
 				}
-				for (int i = 0; i < k; ++i) {
-					System.out.println("rank" + rank + " before computing");
-					tmpClusters[i].printCluster(rank);
-				}
-				for (int index = start; index < end; ++index) {
-					System.out.println("index " + index);
-					Point2D point = allDataPoints.get(index);
-					int clusterIndex = findNearestCentroid(point);
-					PointCluster pc = tmpClusters[clusterIndex];
-					int originalClusterIndex = point.getCluster();
-					// first iteration or change to another cluster
-					if (originalClusterIndex == -1 || clusterIndex != originalClusterIndex) {
-						changed[0] = true;
-//						System.out.println("rank " + rank + " " + point + " to cluster " + clusterIndex);
-//						System.out.println("rank " + rank + " first iteration!");
-//						System.out.print("Rank " + rank + " In computing: ");
-//						pc.printCluster(rank);
-					}
-					pc.addPointAndIncreaseSum(point);
-					point.setCluster(clusterIndex);
-					System.out.println("rank " + rank + " " + point + " to cluster " + clusterIndex);
-				}
+				changed[0] = computing(tmpClusters);
+
 				// tell master if there is change between 2 iterations
-				System.out.println("rank " + rank + " sending changed info to master");
 				MPI.COMM_WORLD.Send(changed, 0, 1, MPI.BOOLEAN, 0, 2);
+
 				// receive from master if slave should stop computing
 				boolean[] stop = new boolean[1];
 				MPI.COMM_WORLD.Recv(stop, 0, 1, MPI.BOOLEAN, 0, 3);
@@ -209,15 +139,124 @@ public class ParallelKMeansOnPoint {
 					System.out.println("rank " + rank + " finish computing!");
 					break;
 				}
+
 				// if not done, tell master its clusters infomation
-				System.out.println("before sending to master");
-				for (int i = 0; i < k; ++i) {
-					System.out.println("cluster " + i);
-					tmpClusters[i].printCluster(rank);
-				}
 				MPI.COMM_WORLD.Send(tmpClusters, 0, k, MPI.OBJECT, 0, 4);
 				System.out.println("rank " + rank + " sending cluster info to master");
 				++iter;
+			}
+		}
+	}
+
+	/**
+	 * Called by master.
+	 * If all slaves' points do not change cluster during two consecutive iterations, 
+	 * the algorithm can stop.
+	 * The master also tell all slaves the stop information
+	 * @return true if the algorithm can stop, false otherwise.
+	 */
+	private boolean canStop() {
+		boolean changed = false;
+		// receive from all slaves if their points have changed clusters between 2 clusters
+		for (int slaveRank = 1; slaveRank < size; ++slaveRank ) {
+			// It's weird that I cannot simply pass boolean using MPI.COMM_WORLD.Send
+			boolean[] slaveChanged = new boolean[1];
+			slaveChanged[0] = false;
+			MPI.COMM_WORLD.Recv(slaveChanged, 0, 1, MPI.BOOLEAN, slaveRank, 2);
+			changed |= slaveChanged[0];
+//			System.out.println("Receive from rank " + rank + " of changed info: " + slaveChanged[0]);
+		}
+		tellStop(!changed);
+		return !changed;
+	}
+
+	/**
+	 * Called by master to tell all slaves if they should stop computing
+	 * @param stopFlag true to stop, false to continue
+	 */
+	private void tellStop(boolean stopFlag) {
+		// tell all slaves if the algorithm can stop
+		boolean[] stop = new boolean[1];
+		stop[0] = stopFlag;
+		for (int slaveRank = 1; slaveRank < size; ++slaveRank ) {
+			MPI.COMM_WORLD.Send(stop, 0, 1, MPI.BOOLEAN, slaveRank, 3);
+		}
+	}
+
+	/**
+	 * Called by master to tell all slaves the new centroids
+	 */
+	private void broadcastNewCentroids() {
+		for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
+			System.out.println("sending to rank " + slaveRank + " new centoird point");
+			MPI.COMM_WORLD.Send(centroids, 0, k, MPI.OBJECT, slaveRank, 1);
+		}
+	}
+
+	/**
+	 * Called by slaves to receive new centroids from master
+	 */
+	private void receiveNewCentroids() {
+		MPI.COMM_WORLD.Recv(centroids, 0, k, MPI.OBJECT, 0, 1);
+		for (int i = 0; i < k; ++i) {
+			System.out.println("rank " + rank + " receive centroid point: " 
+					+ centroids[i]);
+		}
+	}
+
+	/**
+	 * Called by slaves to compute 
+	 * 1. each point belong to which cluster
+	 * 2. sum of the coordinates in all clusters (used by master to efficiently get new centroids)
+	 * @return
+	 */
+	private boolean computing(PointCluster[] tmpClusters) {
+		boolean changed = false;
+		int start = offset, end; 
+		if (rank == size - 1) {  // last processor may have more points to compute
+			end = pointNum;
+		} else {
+			end = offset + len;
+		}
+		for (int index = start; index < end; ++index) {
+			Point2D point = allDataPoints.get(index);
+			int clusterIndex = findNearestCentroid(point);
+			PointCluster pc = tmpClusters[clusterIndex];
+			int originalClusterIndex = point.getCluster();
+			// first iteration or change to another cluster
+			if (originalClusterIndex == -1 || clusterIndex != originalClusterIndex) {
+				changed = true;
+				//	pc.printCluster(rank);
+			}
+			pc.addPointAndIncreaseSum(point);
+			point.setCluster(clusterIndex);
+			System.out.println("rank " + rank + " " + point + " to cluster " + clusterIndex);
+		}
+		return changed;
+	}
+
+	/**
+	 * Called by master 
+	 * Each slave is assigned a number of points and compute to which cluster
+	 * these points belong.
+	 * Master then aggregate all this information.
+	 */
+	private void aggregateClustersInfo() {
+		// each time we get latest info from slaves
+		pointClusters = new PointCluster[k];
+		for (int i = 0; i < k; ++i) {
+			pointClusters[i] = new PointCluster();
+		}
+		for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
+			PointCluster[] tmpClusters = new PointCluster[k];
+			MPI.COMM_WORLD.Recv(tmpClusters, 0, k, MPI.OBJECT, slaveRank, 4);
+			System.out.println("Reveive clusters info from slave rank " + slaveRank);
+			for (int i = 0; i < k; ++i) {
+				pointClusters[i].addAll(tmpClusters[i]);  // do NOT calculate sum here.
+				// add clusters sum ALREADY computed by slave ranks
+				pointClusters[i].increaseSum(tmpClusters[i].getSumX(), tmpClusters[i].getSumY());
+				//						pointClusters[i].printCluster(rank);
+				//						System.out.println("sumX: " + pointClusters[i].getSumX() + " sumY:" + pointClusters[i].getSumY());
 			}
 		}
 	}

@@ -58,13 +58,6 @@ public class SequentialKMeansOnPoint {
 	private void initializeCluster() {
 		assert(this.pointNum >= k);
 		
-		
-//			PointCluster pc = new PointCluster();
-//			pc.setCentroid(new Point2D(points.get(0)));
-//			pointClusters.add(pc);
-//			PointCluster pc2 = new PointCluster();
-//			pc2.setCentroid(new Point2D(points.get(3)));
-//			pointClusters.add(pc2);
 		// use hash set to avoid choosing the same point
 		Set<Integer> centerIndexes = new HashSet<Integer>();
 		Random random = new Random();

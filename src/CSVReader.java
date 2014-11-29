@@ -3,7 +3,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.StringTokenizer;
-import mpi.*;
 
 /**
  * Read CSV file, results is put in a String array.

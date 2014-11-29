@@ -1,5 +1,4 @@
 import java.io.Serializable;
-import mpi.*;
 
 /**
  * 2D Point class
