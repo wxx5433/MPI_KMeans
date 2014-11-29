@@ -81,6 +81,13 @@ public class PointCluster implements Serializable {
 	public Iterable<Point2D> getPoints() {
 		return this.points;
 	}
+	
+	public void printCluster(int rank) {
+		System.out.println("rank " + rank + " start print cluster ");
+		for (Point2D point: points) {
+			System.out.println(point);
+		}
+	}
 	//
 	//	public Point2D getFarthestPoint() {
 	//		return farthestPoint;
