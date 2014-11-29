@@ -56,7 +56,7 @@ public class ParallelKMeansOnPoint {
 	 * @param fileName name of the CSV file to load
 	 */
 	private void loadData(String fileName) {
-		System.out.println("load data");
+//		System.out.println("load data");
 		CSVReader csvReader = new CSVReader(fileName);
 		String[] coordinates = null;
 		while ((coordinates = csvReader.readRecord()) != null) {
@@ -134,7 +134,7 @@ public class ParallelKMeansOnPoint {
 				// receive from master if slave should stop computing
 				boolean[] stop = new boolean[1];
 				MPI.COMM_WORLD.Recv(stop, 0, 1, MPI.BOOLEAN, 0, 3);
-				System.out.println("rank " + rank + " received stop info from master " + stop[0]);
+//				System.out.println("rank " + rank + " received stop info from master " + stop[0]);
 				if (stop[0]) {  // done!
 					System.out.println("rank " + rank + " finish computing!");
 					break;
@@ -142,7 +142,7 @@ public class ParallelKMeansOnPoint {
 
 				// if not done, tell master its clusters infomation
 				MPI.COMM_WORLD.Send(tmpClusters, 0, k, MPI.OBJECT, 0, 4);
-				System.out.println("rank " + rank + " sending cluster info to master");
+//				System.out.println("rank " + rank + " sending cluster info to master");
 				++iter;
 			}
 		}
@@ -188,7 +188,7 @@ public class ParallelKMeansOnPoint {
 	 */
 	private void broadcastNewCentroids() {
 		for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
-			System.out.println("sending to rank " + slaveRank + " new centoird point");
+//			System.out.println("sending to rank " + slaveRank + " new centoird point");
 			MPI.COMM_WORLD.Send(centroids, 0, k, MPI.OBJECT, slaveRank, 1);
 		}
 	}
@@ -199,8 +199,8 @@ public class ParallelKMeansOnPoint {
 	private void receiveNewCentroids() {
 		MPI.COMM_WORLD.Recv(centroids, 0, k, MPI.OBJECT, 0, 1);
 		for (int i = 0; i < k; ++i) {
-			System.out.println("rank " + rank + " receive centroid point: " 
-					+ centroids[i]);
+			System.out.println("rank " + rank + " receive centroid point " + i 
+					+ ": " + centroids[i]);
 		}
 	}
 
@@ -230,7 +230,7 @@ public class ParallelKMeansOnPoint {
 			}
 			pc.addPointAndIncreaseSum(point);
 			point.setCluster(clusterIndex);
-			System.out.println("rank " + rank + " " + point + " to cluster " + clusterIndex);
+//			System.out.println("rank " + rank + " " + point + " to cluster " + clusterIndex);
 		}
 		return changed;
 	}
@@ -250,7 +250,7 @@ public class ParallelKMeansOnPoint {
 		for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
 			PointCluster[] tmpClusters = new PointCluster[k];
 			MPI.COMM_WORLD.Recv(tmpClusters, 0, k, MPI.OBJECT, slaveRank, 4);
-			System.out.println("Reveive clusters info from slave rank " + slaveRank);
+//			System.out.println("Reveive clusters info from slave rank " + slaveRank);
 			for (int i = 0; i < k; ++i) {
 				pointClusters[i].addAll(tmpClusters[i]);  // do NOT calculate sum here.
 				// add clusters sum ALREADY computed by slave ranks
@@ -267,7 +267,6 @@ public class ParallelKMeansOnPoint {
 	private void updateCentroid() {
 		for (int i = 0; i < k; ++i) {
 			PointCluster pc = pointClusters[i];
-			System.out.println("haha sum " + pc.getSumX() + ", " + pc.getSumY());
 			centroids[i] = pc.updateCentroid();
 		}
 	}
