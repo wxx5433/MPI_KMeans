@@ -89,16 +89,16 @@ public class SequentialKMeansOnPoint {
 				int originalClusterIndex = point.getCluster();
 				// first iteration
 				if (originalClusterIndex == -1) {
-					pc.addPoint(point);
+					pc.addPointAndIncreaseSum(point);
 					point.setCluster(clusterIndex);
 					continue;
 				}
 				// remove from the original cluster
 				if (clusterIndex != originalClusterIndex) {
-					pointClusters.get(originalClusterIndex).removePoint(point);
+					pointClusters.get(originalClusterIndex).removePointAndDecreaseSum(point);
 					changed = true;  // some point change to another cluster
 					// add to new cluster
-					pc.addPoint(point);
+					pc.addPointAndIncreaseSum(point);
 					point.setCluster(clusterIndex);
 				}
 			}

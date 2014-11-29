@@ -3,6 +3,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.StringTokenizer;
+import mpi.*;
 
 /**
  * Read CSV file, results is put in a String array.
@@ -25,6 +26,7 @@ public class CSVReader {
 		try {
 			fr = new FileReader(fileName);
 		} catch (FileNotFoundException e) {
+			System.out.println(fileName);
 			System.out.println("Fail to open input csv file");
 			e.printStackTrace();
 		}

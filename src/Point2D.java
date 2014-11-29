@@ -1,3 +1,5 @@
+import java.io.Serializable;
+import mpi.*;
 
 /**
  * 2D Point class
@@ -5,8 +7,9 @@
  * @author Ye Zhou (yezhou)
  *
  */
-public class Point2D {
+public class Point2D implements Serializable {
 
+	private static final long serialVersionUID = -2419795115854228440L;
 	// to which cluster the point belong
 	private int cluster;
 	// coordinates of the point
