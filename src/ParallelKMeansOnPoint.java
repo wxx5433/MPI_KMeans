@@ -306,11 +306,10 @@ public class ParallelKMeansOnPoint {
 			bw = new BufferedWriter(fw);
 			for (int i = 0; i < k; ++i) {
 				PointCluster pc = pointClusters[i];
-
-				System.out.println("Cluster " + i);
+//				System.out.println("Cluster " + i);
 				bw.write("Cluster " + i + ":\n");
 				for (Point2D point: pc.getPoints()) {
-					System.out.println("\t" + point);
+//					System.out.println("\t" + point);
 					bw.write("\t" + point + "\n");
 				}
 			}
