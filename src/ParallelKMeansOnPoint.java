@@ -27,11 +27,12 @@ public class ParallelKMeansOnPoint {
 	private int maxIter;
 	// list of k clusters
 	private PointCluster[] pointClusters;
-
+	// k centroid points
 	private Point2D[] centroids;
 
 	private int rank;
 	private int size;
+	// offset and len denote which range of data points the slave node should process
 	private int offset;
 	private int len;
 
