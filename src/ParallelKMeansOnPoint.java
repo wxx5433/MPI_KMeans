@@ -36,7 +36,7 @@ public class ParallelKMeansOnPoint {
 	private int offset;
 	private int len;
 
-	public ParallelKMeansOnPoint(String fileName, int k, int maxIter) {
+	public ParallelKMeansOnPoint(String fileName, int k, int maxIter) throws MPIException {
 		this.rank = MPI.COMM_WORLD.Rank();
 		this.size = MPI.COMM_WORLD.Size();
 		this.k = k;
@@ -94,7 +94,7 @@ public class ParallelKMeansOnPoint {
 	 * 		1. reach max iterations 
 	 *  	2. no change between 2 iterations
 	 */
-	public void doClustering() {
+	public void doClustering() throws MPIException {
 		if (rank == 0) { // master do not compute
 			for (int iter = 1; iter < maxIter; ++iter) {
 				// tell slaves the new centroid points
@@ -156,7 +156,7 @@ public class ParallelKMeansOnPoint {
 	 * The master also tell all slaves the stop information
 	 * @return true if the algorithm can stop, false otherwise.
 	 */
-	private boolean canStop() {
+	private boolean canStop() throws MPIException {
 		boolean changed = false;
 		// receive from all slaves if their points have changed clusters between 2 clusters
 		for (int slaveRank = 1; slaveRank < size; ++slaveRank ) {
@@ -175,7 +175,7 @@ public class ParallelKMeansOnPoint {
 	 * Called by master to tell all slaves if they should stop computing
 	 * @param stopFlag true to stop, false to continue
 	 */
-	private void tellStop(boolean stopFlag) {
+	private void tellStop(boolean stopFlag) throws MPIException {
 		// tell all slaves if the algorithm can stop
 		boolean[] stop = new boolean[1];
 		stop[0] = stopFlag;
@@ -187,7 +187,7 @@ public class ParallelKMeansOnPoint {
 	/**
 	 * Called by master to tell all slaves the new centroids
 	 */
-	private void broadcastNewCentroids() {
+	private void broadcastNewCentroids() throws MPIException {
 		for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
 //			System.out.println("sending to rank " + slaveRank + " new centoird point");
 			MPI.COMM_WORLD.Send(centroids, 0, k, MPI.OBJECT, slaveRank, 1);
@@ -197,7 +197,7 @@ public class ParallelKMeansOnPoint {
 	/**
 	 * Called by slaves to receive new centroids from master
 	 */
-	private void receiveNewCentroids() {
+	private void receiveNewCentroids() throws MPIException {
 		MPI.COMM_WORLD.Recv(centroids, 0, k, MPI.OBJECT, 0, 1);
 		for (int i = 0; i < k; ++i) {
 			System.out.println("rank " + rank + " receive centroid point " + i 
@@ -242,7 +242,7 @@ public class ParallelKMeansOnPoint {
 	 * these points belong.
 	 * Master then aggregate all this information.
 	 */
-	private void aggregateClustersInfo() {
+	private void aggregateClustersInfo() throws MPIException {
 		// each time we get latest info from slaves
 		pointClusters = new PointCluster[k];
 		for (int i = 0; i < k; ++i) {
@@ -326,13 +326,13 @@ public class ParallelKMeansOnPoint {
 		}
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws MPIException {
 		MPI.Init(args);
 		// user arguments start from index 3
-		int k = Integer.parseInt(args[3]);
-		int maxIter = Integer.parseInt(args[4]);
-		String inputFileName = args[5];
-		String outputFileName = args[6];
+		int k = Integer.parseInt(args[0]);
+		int maxIter = Integer.parseInt(args[1]);
+		String inputFileName = args[2];
+		String outputFileName = args[3];
 		ParallelKMeansOnPoint kmp = new ParallelKMeansOnPoint(inputFileName, k, maxIter);
 		kmp.doClustering();
 		kmp.outputResult(outputFileName);
