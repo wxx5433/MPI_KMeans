@@ -36,7 +36,7 @@ public class ParallelKMeansOnPoint {
 	private int offset;
 	private int len;
 
-	public ParallelKMeansOnPoint(String fileName, int k, int maxIter) throws MPIException {
+	public ParallelKMeansOnPoint(String fileName, int k, int maxIter)  {
 		this.rank = MPI.COMM_WORLD.Rank();
 		this.size = MPI.COMM_WORLD.Size();
 		this.k = k;
@@ -57,7 +57,7 @@ public class ParallelKMeansOnPoint {
 	 * @param fileName name of the CSV file to load
 	 */
 	private void loadData(String fileName) {
-//		System.out.println("load data");
+		//		System.out.println("load data");
 		CSVReader csvReader = new CSVReader(fileName);
 		String[] coordinates = null;
 		while ((coordinates = csvReader.readRecord()) != null) {
@@ -86,6 +86,10 @@ public class ParallelKMeansOnPoint {
 			centroids[i++] = new Point2D(allDataPoints.get(centerIndex));
 			centerIndexes.add(centerIndex);
 		} 
+		// use for test
+		//		for (int i = 0; i < k; ++i) {
+		//			centroids[i] = new Point2D(allDataPoints.get(i));
+		//		}
 	}
 
 	/**
@@ -94,26 +98,27 @@ public class ParallelKMeansOnPoint {
 	 * 		1. reach max iterations 
 	 *  	2. no change between 2 iterations
 	 */
-	public void doClustering() throws MPIException {
+	public void doClustering()  {
 		if (rank == 0) { // master do not compute
+			boolean stop = false;
 			for (int iter = 1; iter < maxIter; ++iter) {
 				// tell slaves the new centroid points
 				broadcastNewCentroids();
 
 				// ask each slaves to know if the algorithm can stop
-				boolean stop = canStop();
+				stop = canStop();
 				if (stop) {  // done!
-					return;
-				}
-
-				// aggregate all clusters info from slaves
-				aggregateClustersInfo();
-				
+					break;
+				} 
+				// tell the slave stop info (actually, here we tell them to continue
+				tellStop(stop);
 				// now can easily recalculate centroids by infomation fetched from slaves
 				updateCentroid();
 			}
-			// reach maximum iterations, stop the algorithm!
+			// converge or reach maximum iterations, stop the algorithm!
 			tellStop(true);
+			// aggregate all clusters info from slaves to get final result
+			aggregateClustersInfo();
 		} else {  // slaves 
 			int iter = 1;
 			while (true) {
@@ -135,18 +140,40 @@ public class ParallelKMeansOnPoint {
 				// receive from master if slave should stop computing
 				boolean[] stop = new boolean[1];
 				MPI.COMM_WORLD.Recv(stop, 0, 1, MPI.BOOLEAN, 0, 3);
-//				System.out.println("rank " + rank + " received stop info from master " + stop[0]);
-				if (stop[0]) {  // done!
+				//				System.out.println("rank " + rank + " received stop info from master " + stop[0]);
+				if (stop[0]) {  // done! 
+					// send cluster info to master
+					MPI.COMM_WORLD.Send(tmpClusters, 0, k, MPI.OBJECT, 0, 6);
 					System.out.println("rank " + rank + " finish computing!");
 					break;
 				}
 
-				// if not done, tell master its clusters infomation
-				MPI.COMM_WORLD.Send(tmpClusters, 0, k, MPI.OBJECT, 0, 4);
-//				System.out.println("rank " + rank + " sending cluster info to master");
+				// if not done, tell master sum information
+				sendSum(tmpClusters);
 				++iter;
 			}
 		}
+	}
+
+	/**
+	 * Called by slave to send cluster sum info to master
+	 * @param tmpClusters the clusters info on a specific slave node
+	 */
+	private void sendSum(PointCluster[] tmpClusters) {
+		double[] sumX = new double[k];
+		double[] sumY = new double[k];
+		for (int i = 0; i < k; ++i) {
+			sumX[i] += tmpClusters[i].getSumX();
+			sumY[i] += tmpClusters[i].getSumY();
+			System.out.println("rank 1's sum" + sumX[i] + ", " + sumY[i]);
+		}
+		MPI.COMM_WORLD.Send(sumX, 0, k, MPI.DOUBLE, 0, 4);
+		MPI.COMM_WORLD.Send(sumY, 0, k, MPI.DOUBLE, 0, 5);
+		int[] pointNum = new int[k];
+		for (int i = 0; i < k; ++i) {
+			pointNum[i] = tmpClusters[i].getPointNum();
+		}
+		MPI.COMM_WORLD.Send(pointNum, 0, k, MPI.INT, 0, 7);
 	}
 
 	/**
@@ -156,7 +183,7 @@ public class ParallelKMeansOnPoint {
 	 * The master also tell all slaves the stop information
 	 * @return true if the algorithm can stop, false otherwise.
 	 */
-	private boolean canStop() throws MPIException {
+	private boolean canStop()  {
 		boolean changed = false;
 		// receive from all slaves if their points have changed clusters between 2 clusters
 		for (int slaveRank = 1; slaveRank < size; ++slaveRank ) {
@@ -165,9 +192,8 @@ public class ParallelKMeansOnPoint {
 			slaveChanged[0] = false;
 			MPI.COMM_WORLD.Recv(slaveChanged, 0, 1, MPI.BOOLEAN, slaveRank, 2);
 			changed |= slaveChanged[0];
-//			System.out.println("Receive from rank " + rank + " of changed info: " + slaveChanged[0]);
+			//			System.out.println("Receive from rank " + rank + " of changed info: " + slaveChanged[0]);
 		}
-		tellStop(!changed);
 		return !changed;
 	}
 
@@ -175,7 +201,7 @@ public class ParallelKMeansOnPoint {
 	 * Called by master to tell all slaves if they should stop computing
 	 * @param stopFlag true to stop, false to continue
 	 */
-	private void tellStop(boolean stopFlag) throws MPIException {
+	private void tellStop(boolean stopFlag)  {
 		// tell all slaves if the algorithm can stop
 		boolean[] stop = new boolean[1];
 		stop[0] = stopFlag;
@@ -187,9 +213,9 @@ public class ParallelKMeansOnPoint {
 	/**
 	 * Called by master to tell all slaves the new centroids
 	 */
-	private void broadcastNewCentroids() throws MPIException {
+	private void broadcastNewCentroids()  {
 		for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
-//			System.out.println("sending to rank " + slaveRank + " new centoird point");
+			//			System.out.println("sending to rank " + slaveRank + " new centoird point");
 			MPI.COMM_WORLD.Send(centroids, 0, k, MPI.OBJECT, slaveRank, 1);
 		}
 	}
@@ -197,7 +223,7 @@ public class ParallelKMeansOnPoint {
 	/**
 	 * Called by slaves to receive new centroids from master
 	 */
-	private void receiveNewCentroids() throws MPIException {
+	private void receiveNewCentroids()  {
 		MPI.COMM_WORLD.Recv(centroids, 0, k, MPI.OBJECT, 0, 1);
 		for (int i = 0; i < k; ++i) {
 			System.out.println("rank " + rank + " receive centroid point " + i 
@@ -231,7 +257,7 @@ public class ParallelKMeansOnPoint {
 			}
 			pc.addPointAndIncreaseSum(point);
 			point.setCluster(clusterIndex);
-//			System.out.println("rank " + rank + " " + point + " to cluster " + clusterIndex);
+			//			System.out.println("rank " + rank + " " + point + " to cluster " + clusterIndex);
 		}
 		return changed;
 	}
@@ -242,7 +268,7 @@ public class ParallelKMeansOnPoint {
 	 * these points belong.
 	 * Master then aggregate all this information.
 	 */
-	private void aggregateClustersInfo() throws MPIException {
+	private void aggregateClustersInfo()  {
 		// each time we get latest info from slaves
 		pointClusters = new PointCluster[k];
 		for (int i = 0; i < k; ++i) {
@@ -250,12 +276,12 @@ public class ParallelKMeansOnPoint {
 		}
 		for (int slaveRank = 1; slaveRank < size; ++slaveRank) {
 			PointCluster[] tmpClusters = new PointCluster[k];
-			MPI.COMM_WORLD.Recv(tmpClusters, 0, k, MPI.OBJECT, slaveRank, 4);
-//			System.out.println("Reveive clusters info from slave rank " + slaveRank);
+			MPI.COMM_WORLD.Recv(tmpClusters, 0, k, MPI.OBJECT, slaveRank, 6);
+			//			System.out.println("Reveive clusters info from slave rank " + slaveRank);
 			for (int i = 0; i < k; ++i) {
-				pointClusters[i].addAll(tmpClusters[i]);  // do NOT calculate sum here.
+				pointClusters[i].addAll(tmpClusters[i]);  
 				// add clusters sum ALREADY computed by slave ranks
-				pointClusters[i].increaseSum(tmpClusters[i].getSumX(), tmpClusters[i].getSumY());
+				//				pointClusters[i].increaseSum(tmpClusters[i].getSumX(), tmpClusters[i].getSumY());
 				//						pointClusters[i].printCluster(rank);
 				//						System.out.println("sumX: " + pointClusters[i].getSumX() + " sumY:" + pointClusters[i].getSumY());
 			}
@@ -266,11 +292,32 @@ public class ParallelKMeansOnPoint {
 	 * update all clusters' centroid point
 	 */
 	private void updateCentroid() {
+		// first receive sum from slaves
+		double [] sumX = new double[k];
+		double[] sumY = new double[k];
+		int[] clusterPointNum = new int[k];
+		for (int rank = 1; rank < size; ++rank) {
+			double[] tmpSumX = new double[k];
+			double[] tmpSumY = new double[k];
+			int[] tmpPointNum = new int[k];
+			System.out.println("receive sum from rank " + rank);
+			MPI.COMM_WORLD.Recv(tmpSumX, 0, k, MPI.DOUBLE, rank, 4);
+			MPI.COMM_WORLD.Recv(tmpSumY, 0, k, MPI.DOUBLE, rank, 5);
+			MPI.COMM_WORLD.Recv(tmpPointNum, 0, k, MPI.INT, rank, 7);
+			for (int i = 0; i < k; ++i) {
+				System.out.println("sum: " + tmpSumX[i] + "," + tmpSumY[i]);
+				sumX[i] += tmpSumX[i];
+				sumY[i] += tmpSumY[i];
+				clusterPointNum[i] += tmpPointNum[i];
+				System.out.println("cluster" + i + "'s point num: " + tmpPointNum[i]);
+			}
+		}
+		System.out.println("receive sum from all ranks");
 		for (int i = 0; i < k; ++i) {
-			PointCluster pc = pointClusters[i];
-			centroids[i] = pc.updateCentroid();
+			centroids[i] = new Point2D(sumX[i] / clusterPointNum[i], sumY[i] / clusterPointNum[i]);
 		}
 	}
+	
 
 	/**
 	 * assign each point to its nearest cluster centroid
@@ -306,10 +353,10 @@ public class ParallelKMeansOnPoint {
 			bw = new BufferedWriter(fw);
 			for (int i = 0; i < k; ++i) {
 				PointCluster pc = pointClusters[i];
-//				System.out.println("Cluster " + i);
+				//				System.out.println("Cluster " + i);
 				bw.write("Cluster " + i + ":\n");
 				for (Point2D point: pc.getPoints()) {
-//					System.out.println("\t" + point);
+					//					System.out.println("\t" + point);
 					bw.write("\t" + point + "\n");
 				}
 			}
@@ -326,13 +373,13 @@ public class ParallelKMeansOnPoint {
 		}
 	}
 
-	public static void main(String[] args) throws MPIException {
+	public static void main(String[] args)  {
 		MPI.Init(args);
 		// user arguments start from index 3
-		int k = Integer.parseInt(args[0]);
-		int maxIter = Integer.parseInt(args[1]);
-		String inputFileName = args[2];
-		String outputFileName = args[3];
+		int k = Integer.parseInt(args[3]);
+		int maxIter = Integer.parseInt(args[4]);
+		String inputFileName = args[5];
+		String outputFileName = args[6];
 		ParallelKMeansOnPoint kmp = new ParallelKMeansOnPoint(inputFileName, k, maxIter);
 		kmp.doClustering();
 		kmp.outputResult(outputFileName);

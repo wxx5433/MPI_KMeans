@@ -72,6 +72,10 @@ public class PointCluster implements Serializable {
 		sumX -= point.getX();
 		sumY -= point.getY();
 	}
+	
+	public int getPointNum() {
+		return points.size();
+	}
 
 	public boolean isEmpty() {
 		return points.size() == 0;
